@@ -88,18 +88,24 @@ class AIClient:
             if key not in params:
                 params[key] = value
 
-        # 调用 LiteLLM
-        response = completion(**params)
+        # 调用 LiteLLM（空响应重试，DeepSeek 偶发返回空 content）
+        max_empty_retries = 3
+        for attempt in range(max_empty_retries):
+            response = completion(**params)
 
-        # 提取响应内容
-        # 某些模型/提供商返回 list（内容块）而非 str，统一转为 str
-        content = response.choices[0].message.content
-        if isinstance(content, list):
-            content = "\n".join(
-                item.get("text", str(item)) if isinstance(item, dict) else str(item)
-                for item in content
-            )
-        return content or ""
+            # 提取响应内容
+            # 某些模型/提供商返回 list（内容块）而非 str，统一转为 str
+            content = response.choices[0].message.content
+            if isinstance(content, list):
+                content = "\n".join(
+                    item.get("text", str(item)) if isinstance(item, dict) else str(item)
+                    for item in content
+                )
+            if content and content.strip():
+                return content
+            # 空响应，重试
+            print(f"[AIClient] 空响应，重试 {attempt+1}/{max_empty_retries}")
+        return ""
 
     def validate_config(self) -> tuple[bool, str]:
         """
