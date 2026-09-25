@@ -11,6 +11,32 @@ from typing import Any, Dict, List
 
 from litellm import completion
 
+# 9-26: 用量回流——按贾维斯 cost.ts 的行格式追加（成本盘按 source 自动聚合、护栏同账）
+JARVIS_USAGE_JSONL = "/Users/wangwei/claude_code_workplace/贾维斯/kernel/data/usage.jsonl"
+
+
+def record_usage(response) -> None:
+    """每次 LLM 调用成功后记一行 token 用量；任何失败静默——记账是增益不是依赖"""
+    try:
+        import json as _json
+        from datetime import datetime, timedelta, timezone
+
+        u = getattr(response, "usage", None)
+        if not u or not getattr(u, "total_tokens", 0):
+            return
+        det = getattr(u, "prompt_tokens_details", None)
+        row = {
+            "ts": datetime.now(timezone(timedelta(hours=8))).isoformat(timespec="milliseconds"),
+            "source": "trendradar",
+            "input": getattr(u, "prompt_tokens", 0) or 0,
+            "output": getattr(u, "completion_tokens", 0) or 0,
+            "cached": (getattr(det, "cached_tokens", 0) or 0) if det else 0,
+        }
+        with open(JARVIS_USAGE_JSONL, "a", encoding="utf-8") as f:
+            f.write(_json.dumps(row, ensure_ascii=False) + "\n")
+    except Exception:
+        pass
+
 
 class AIClient:
     """统一的 AI 客户端（基于 LiteLLM）"""
@@ -102,6 +128,7 @@ class AIClient:
                     for item in content
                 )
             if content and content.strip():
+                record_usage(response)
                 return content
             # 空响应，重试
             print(f"[AIClient] 空响应，重试 {attempt+1}/{max_empty_retries}")
