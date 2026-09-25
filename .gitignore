@@ -1,0 +1,8 @@
+# 运行数据与缓存（不入库——数据主权在本地盘）
+output/
+__pycache__/
+*.pyc
+.DS_Store
+**/.DS_Store
+.venv/
+config/config.yaml
